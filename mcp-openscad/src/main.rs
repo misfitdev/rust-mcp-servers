@@ -3,10 +3,13 @@ use std::env;
 mod cli;
 
 use cli::parse_args;
+use openscad_mcp::logging;
+use openscad_mcp::mcp::OpenSCADMCPServer;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = env::args().collect::<Vec<_>>();
     match parse_args(&args) {
         Ok(args) => {
@@ -15,8 +18,20 @@ fn main() {
             } else if args.help {
                 print_help();
             } else {
-                eprintln!("Running OpenSCAD MCP server...");
-                // Server startup would go here
+                // Initialize logging
+                let _ = logging::init_logging();
+
+                // Start MCP server
+                match OpenSCADMCPServer::run().await {
+                    Ok(_) => {
+                        tracing::info!("MCP server exited successfully");
+                    }
+                    Err(e) => {
+                        tracing::error!("MCP server error: {}", e);
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                }
             }
         }
         Err(e) => {
