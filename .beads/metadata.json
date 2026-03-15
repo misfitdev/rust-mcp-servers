@@ -2,6 +2,6 @@
   "database": "dolt",
   "backend": "dolt",
   "dolt_mode": "server",
-  "dolt_database": "rust_mcp_servers",
-  "project_id": "b628bd47-71a9-4f7c-be76-52182f1a555b"
+  "dolt_database": "rmcp",
+  "project_id": "5e27e13a-2777-4f3f-8afe-0e4713baa9be"
 }
