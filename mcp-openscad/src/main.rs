@@ -19,7 +19,7 @@ async fn main() {
                 print_help();
             } else {
                 // Initialize logging
-                let _ = logging::init_logging();
+                logging::init();
 
                 // Start MCP server
                 match OpenSCADMCPServer::run().await {
