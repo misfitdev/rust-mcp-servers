@@ -1,9 +1,59 @@
+# Rust build artifacts
+/target/
+Cargo.lock
+*.rlib
+*.rmeta
+
+# IDE and editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.iml
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+Thumbs.db
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Task/workflow
+.beads/
+.claude/
+.conductor/
 
 # Dolt database files (added by bd init)
 .dolt/
 *.db
 
+# Logs
+*.log
+logs/
 
-# Added by cargo
+# Test coverage
+*.profraw
+*.profdata
+/coverage/
 
-/target
+# OpenSCAD-specific
+*.scad~
+*.bak.scad
