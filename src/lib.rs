@@ -7,6 +7,7 @@ pub mod cache;
 pub mod config;
 pub mod error;
 pub mod logging;
+pub mod metrics;
 pub mod models;
 pub mod render;
 pub mod server;

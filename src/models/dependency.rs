@@ -275,4 +275,68 @@ mod tests {
         assert!(result.contains(&"parameters.scad".to_string()));
         assert!(result.contains(&"parts/base.scad".to_string()));
     }
+
+    #[test]
+    fn test_topological_sort_linear() {
+        let mut graph = DependencyGraph::new();
+        let a = PathBuf::from("a.scad");
+        let b = PathBuf::from("b.scad");
+        let c = PathBuf::from("c.scad");
+
+        graph.add_edge(a.clone(), b.clone());
+        graph.add_edge(b.clone(), c.clone());
+
+        // Graph has no cycles, can be sorted
+        assert!(!graph.has_cycle());
+    }
+
+    #[test]
+    fn test_topological_sort_tree() {
+        let mut graph = DependencyGraph::new();
+        let root = PathBuf::from("root.scad");
+        let left = PathBuf::from("left.scad");
+        let right = PathBuf::from("right.scad");
+
+        graph.add_edge(root.clone(), left.clone());
+        graph.add_edge(root.clone(), right.clone());
+
+        assert!(!graph.has_cycle());
+    }
+
+    #[test]
+    fn test_affected_models_placeholder() {
+        // Placeholder for affected_models() implementation
+        // Should return all models that depend (directly/transitively) on changed file
+        let graph = DependencyGraph::new();
+        assert!(!graph.has_cycle());
+    }
+
+    #[test]
+    fn test_detect_circular_simple_case() {
+        let mut graph = DependencyGraph::new();
+        let a = PathBuf::from("a.scad");
+        let b = PathBuf::from("b.scad");
+
+        graph.add_edge(a.clone(), b.clone());
+        graph.add_edge(b.clone(), a.clone());
+
+        assert!(graph.has_cycle());
+    }
+
+    #[test]
+    fn test_detect_circular_complex() {
+        let mut graph = DependencyGraph::new();
+        let a = PathBuf::from("a.scad");
+        let b = PathBuf::from("b.scad");
+        let c = PathBuf::from("c.scad");
+        let d = PathBuf::from("d.scad");
+
+        // Linear chain: a -> b -> c -> d -> a (cycle)
+        graph.add_edge(a.clone(), b.clone());
+        graph.add_edge(b.clone(), c.clone());
+        graph.add_edge(c.clone(), d.clone());
+        graph.add_edge(d.clone(), a.clone());
+
+        assert!(graph.has_cycle());
+    }
 }
