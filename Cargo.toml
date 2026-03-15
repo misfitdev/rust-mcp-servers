@@ -18,6 +18,7 @@ anyhow = "1.0"
 dotenv = "0.15"
 which = "5.0"
 sha2 = "0.10"
+regex = "1.10"
 
 [lib]
 name = "openscad_mcp"

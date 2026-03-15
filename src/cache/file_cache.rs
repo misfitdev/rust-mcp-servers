@@ -242,7 +242,6 @@ impl FileCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
 
     #[test]
     fn test_compute_key_same_content() {
