@@ -147,6 +147,27 @@ impl ToolRegistry {
     }
 }
 
+/// Helper to build JSON-RPC 2.0 success responses
+fn build_success_response(id: Value, result: Value) -> Value {
+    json!({
+        "jsonrpc": "2.0",
+        "id": id,
+        "result": result
+    })
+}
+
+/// Helper to build JSON-RPC 2.0 error responses
+fn build_error_response(id: Value, code: i32, message: String) -> Value {
+    json!({
+        "jsonrpc": "2.0",
+        "id": id,
+        "error": {
+            "code": code,
+            "message": message
+        }
+    })
+}
+
 /// MCP Server for OpenSCAD tools
 pub struct OpenSCADMCPServer {
     registry: ToolRegistry,
@@ -234,10 +255,9 @@ fn process_message(message: &str, server: &mut OpenSCADMCPServer) -> Result<Opti
 fn handle_initialize(message: &Value) -> Result<Option<String>> {
     let id = message.get("id").cloned().unwrap_or(Value::Null);
 
-    let response = json!({
-        "jsonrpc": "2.0",
-        "id": id,
-        "result": {
+    let response = build_success_response(
+        id,
+        json!({
             "protocolVersion": "2024-11-05",
             "capabilities": {
                 "tools": {}
@@ -246,8 +266,8 @@ fn handle_initialize(message: &Value) -> Result<Option<String>> {
                 "name": "openscad-mcp",
                 "version": env!("CARGO_PKG_VERSION")
             }
-        }
-    });
+        }),
+    );
 
     Ok(Some(response.to_string()))
 }
@@ -256,13 +276,12 @@ fn handle_initialize(message: &Value) -> Result<Option<String>> {
 fn handle_tools_list(message: &Value, server: &OpenSCADMCPServer) -> Result<Option<String>> {
     let id = message.get("id").cloned().unwrap_or(Value::Null);
 
-    let response = json!({
-        "jsonrpc": "2.0",
-        "id": id,
-        "result": {
+    let response = build_success_response(
+        id,
+        json!({
             "tools": server.registry.list()
-        }
-    });
+        }),
+    );
 
     Ok(Some(response.to_string()))
 }
@@ -278,34 +297,19 @@ fn handle_tools_call(message: &Value, server: &OpenSCADMCPServer) -> Result<Opti
     if let Some(name) = tool_name {
         if server.registry.get(name).is_some() {
             // Tool exists - execution would happen here
-            let response = json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": {
+            let response = build_success_response(
+                id,
+                json!({
                     "output": "Tool execution not yet implemented"
-                }
-            });
+                }),
+            );
             Ok(Some(response.to_string()))
         } else {
-            let response = json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "error": {
-                    "code": -32001,
-                    "message": format!("Unknown tool: {}", name)
-                }
-            });
+            let response = build_error_response(id, -32001, format!("Unknown tool: {}", name));
             Ok(Some(response.to_string()))
         }
     } else {
-        let response = json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "error": {
-                "code": -32602,
-                "message": "Missing tool name in params"
-            }
-        });
+        let response = build_error_response(id, -32602, "Missing tool name in params".to_string());
         Ok(Some(response.to_string()))
     }
 }
