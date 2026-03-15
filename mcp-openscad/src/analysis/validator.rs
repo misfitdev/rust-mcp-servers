@@ -3,9 +3,10 @@
 //! Validates SCAD code by running through OpenSCAD and parsing error output.
 
 use crate::error::{Error, Result};
+use crate::render::engine::OpenSCADEngine;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::process::Command;
+use std::time::Duration;
 
 /// Validation result for a SCAD file
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,7 +72,7 @@ impl Default for ValidationResult {
 }
 
 /// Validate SCAD code by running through OpenSCAD
-pub fn validate_scad(content: &str, openscad_path: &str) -> Result<ValidationResult> {
+pub fn validate_scad(content: &str, _openscad_path: &str) -> Result<ValidationResult> {
     // Write content to temp file
     let temp_file = tempfile::NamedTempFile::new()
         .map_err(|e| Error::Cache(format!("Failed to create temp file: {}", e)))?;
@@ -79,15 +80,14 @@ pub fn validate_scad(content: &str, openscad_path: &str) -> Result<ValidationRes
 
     std::fs::write(temp_path, content).map_err(|e| Error::Filesystem(e))?;
 
-    // Run OpenSCAD in validation mode
-    let output = Command::new(openscad_path)
-        .arg("-o")
-        .arg("/dev/null")
-        .arg(temp_path)
-        .output()
-        .map_err(|e| Error::Render(format!("Failed to run openscad: {}", e)))?;
+    // Create OpenSCAD engine (discovers path automatically)
+    let engine = OpenSCADEngine::new()?;
 
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    // Run OpenSCAD in validation mode with 30 second timeout
+    let temp_str = temp_path.to_string_lossy().to_string();
+    let (_stdout, stderr, _code) =
+        engine.execute(&["-o", "/dev/null", &temp_str], Duration::from_secs(30))?;
+
     let mut result = ValidationResult::default();
 
     // Parse errors and warnings from stderr
