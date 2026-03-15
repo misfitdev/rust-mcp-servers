@@ -1,18 +1,19 @@
 #!/usr/bin/env just --justfile
 
+import 'mcp-openscad/justfile'
+import 'shared/justfile'
+
 # Default target: show help
 default:
     @just --list
 
-# Build all crates in the workspace
+# Workspace orchestration
+
+# Build all crates
 build:
     cargo build --workspace
 
-# Build a specific crate
-build-crate crate="openscad-mcp":
-    cargo build -p {{ crate }}
-
-# Build in release mode
+# Build all in release mode
 build-release:
     cargo build --workspace --release
 
@@ -24,23 +25,19 @@ test:
 test-verbose:
     cargo test --workspace --lib -- --nocapture
 
-# Run tests for a specific crate
-test-crate crate="openscad-mcp":
-    cargo test -p {{ crate }} --lib
-
-# Run clippy lints
+# Run all lints
 lint:
     cargo clippy --workspace --lib -- -D warnings
 
-# Format code
+# Format all code
 fmt:
     cargo fmt --all
 
-# Check formatting without making changes
+# Check formatting
 fmt-check:
     cargo fmt --all -- --check
 
-# Run all checks (format, lint, test)
+# Run all checks
 check: fmt-check lint test
     @echo "✓ All checks passed"
 
@@ -48,11 +45,11 @@ check: fmt-check lint test
 clean:
     cargo clean
 
-# Check for security vulnerabilities
+# Check security vulnerabilities
 audit:
     cargo audit
 
-# Full development workflow
+# Full dev workflow
 dev: fmt lint test
     @echo "✓ Ready to commit"
 
@@ -60,15 +57,11 @@ dev: fmt lint test
 release: build-release test
     @echo "✓ Release build successful"
 
-# Show workspace structure
+# Show workspace info
 info:
     @echo "Workspace members:"
     @cargo metadata --format-version 1 | jq -r '.workspace_members[] | split(" ") | .[0]'
 
-# Run OpenSCAD MCP binary (if applicable)
-run-openscad:
-    cargo run -p openscad-mcp --bin openscad-mcp
-
-# Development watch mode (requires watchexec)
+# Watch and rerun task
 watch task="test":
     watchexec -e rs just {{ task }}

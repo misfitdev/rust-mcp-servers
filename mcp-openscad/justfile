@@ -1,0 +1,30 @@
+#!/usr/bin/env just --justfile
+
+# OpenSCAD MCP Server (mcp-openscad) tasks
+
+build-openscad:
+    cargo build -p openscad-mcp
+
+build-openscad-release:
+    cargo build -p openscad-mcp --release
+
+test-openscad:
+    cargo test -p openscad-mcp --lib
+
+test-openscad-verbose:
+    cargo test -p openscad-mcp --lib -- --nocapture
+
+lint-openscad:
+    cargo clippy -p openscad-mcp --lib -- -D warnings
+
+fmt-openscad:
+    cargo fmt --manifest-path mcp-openscad/Cargo.toml
+
+fmt-openscad-check:
+    cargo fmt --manifest-path mcp-openscad/Cargo.toml -- --check
+
+check-openscad: fmt-openscad-check lint-openscad test-openscad
+    @echo "✓ OpenSCAD MCP checks passed"
+
+run-openscad:
+    cargo run -p openscad-mcp --bin openscad-mcp

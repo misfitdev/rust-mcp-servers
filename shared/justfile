@@ -1,0 +1,21 @@
+#!/usr/bin/env just --justfile
+
+# Shared utilities crate tasks
+
+build-shared:
+    cargo build -p shared
+
+build-shared-release:
+    cargo build -p shared --release
+
+fmt-shared:
+    cargo fmt --manifest-path shared/Cargo.toml
+
+fmt-shared-check:
+    cargo fmt --manifest-path shared/Cargo.toml -- --check
+
+lint-shared:
+    cargo clippy -p shared --lib -- -D warnings
+
+check-shared: fmt-shared-check lint-shared
+    @echo "✓ Shared crate checks passed"
