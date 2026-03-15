@@ -1,0 +1,8 @@
+{
+  "track_id": "core_openscad_mvp_20260315",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-03-15T00:00:00Z",
+  "updated_at": "2026-03-15T00:00:00Z",
+  "description": "Build the MVP Rust-based OpenSCAD MCP server with core rendering, caching, and observability features"
+}
