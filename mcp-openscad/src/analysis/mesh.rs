@@ -62,7 +62,6 @@ pub fn parse_stl(path: impl AsRef<Path>) -> Result<MeshMetrics> {
         vertex_count: 0,
     };
 
-    let mut in_facet = false;
     let mut in_loop = false;
 
     for line in reader.lines() {
@@ -70,10 +69,7 @@ pub fn parse_stl(path: impl AsRef<Path>) -> Result<MeshMetrics> {
         let trimmed = line.trim();
 
         if trimmed.starts_with("facet") {
-            in_facet = true;
             metrics.triangle_count += 1;
-        } else if trimmed.starts_with("endfacet") {
-            in_facet = false;
         } else if trimmed.starts_with("outer loop") {
             in_loop = true;
         } else if trimmed.starts_with("endloop") {

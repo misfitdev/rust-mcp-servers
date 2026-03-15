@@ -248,9 +248,8 @@ mod tests {
     #[test]
     fn test_subprocess_stderr_capture() {
         if let Ok(engine) = OpenSCADEngine::new() {
-            if let Ok((_, stderr, _)) = engine.execute(&["--invalid"], Duration::from_secs(5)) {
+            if let Ok((_, _stderr, _)) = engine.execute(&["--invalid"], Duration::from_secs(5)) {
                 // stderr may be empty or contain error message
-                assert!(stderr.len() >= 0);
             }
         }
     }
