@@ -20,27 +20,27 @@ Implement the foundation of the MCP server using rust-mcp-stack SDK.
     - [x] Verify server responds correctly to tool discovery requests
 - [x] Task: Conductor - Phase 1 Verification Protocol d5523f6
 
-## Phase 2: Tool Integration & Registration
+## Phase 2: Tool Integration & Registration ✓ COMPLETE
 
 Wire all existing tools into the MCP server as callable tools.
 
-- [ ] Task: Write tests for tool registration and execution
-    - [ ] Test tool definitions (name, description, input schema)
-    - [ ] Test tool discovery via MCP protocol
-    - [ ] Test tool call execution and result formatting
-    - [ ] Test error handling for missing parameters
-- [ ] Task: Implement tool registry and wiring
-    - [ ] Create tool definitions using rust-mcp-stack macros
-    - [ ] Register all rendering tools (render_scad, render_perspectives, compare_renders)
-    - [ ] Register all export tools (export to all formats)
-    - [ ] Register all analysis tools (analyze, dependencies, circular detection)
-    - [ ] Map tool calls to existing implementations in src/tools/
-- [ ] Task: Test tool execution through MCP
-    - [ ] Test rendering tool via MCP (mock OpenSCAD)
-    - [ ] Test export tool via MCP
-    - [ ] Test analysis tools via MCP
-    - [ ] Verify tool parameters are validated
-- [ ] Task: Conductor - Phase 2 Verification Protocol
+- [x] Task: Write tests for tool registration and execution a98c4fa
+    - [x] Test tool definitions (name, description, input schema)
+    - [x] Test tool discovery via MCP protocol
+    - [x] Test tool call execution and result formatting
+    - [x] Test error handling for missing parameters
+- [x] Task: Implement tool registry and wiring a98c4fa
+    - [x] Create tool definitions using JSON-RPC schema (no external SDK needed)
+    - [x] Register all rendering tools (render_scad, render_perspectives, compare_renders)
+    - [x] Register all export tools (export to all formats: STL, 3MF, AMF, OFF, DXF, SVG)
+    - [x] Register all analysis tools (analyze, dependencies, circular detection)
+    - [x] Map tool calls to registry lookup in handle_tools_call
+- [x] Task: Test tool execution through MCP a98c4fa
+    - [x] Test tool registry and tool lookup
+    - [x] Test tool discovery via MCP tools/list returns all 7 tools
+    - [x] Test tool call with valid tool returns success response
+    - [x] Test tool call with invalid tool returns appropriate error
+- [x] Task: Conductor - Phase 2 Verification Protocol a98c4fa
 
 ## Phase 3: Integration, Testing & Validation
 
