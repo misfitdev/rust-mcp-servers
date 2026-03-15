@@ -440,4 +440,175 @@ mod tests {
         let parsed: Value = serde_json::from_str(&response).unwrap();
         assert_eq!(parsed["result"]["tools"].as_array().unwrap().len(), 7);
     }
+
+    // Integration tests: Full MCP client workflow
+
+    #[test]
+    fn test_full_mcp_handshake() {
+        let mut server = OpenSCADMCPServer::new();
+
+        // Step 1: Initialize
+        let init_json = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#;
+        let init_result = process_message(init_json, &mut server);
+        assert!(init_result.is_ok());
+        let init_response = init_result.unwrap().unwrap();
+        let init_parsed: Value =
+            serde_json::from_str(&init_response).expect("Failed to parse init response");
+        assert_eq!(init_parsed["id"], 1);
+        assert!(init_parsed["result"]["protocolVersion"]
+            .as_str()
+            .unwrap()
+            .contains("2024"));
+
+        // Step 2: List tools
+        let list_json = r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#;
+        let list_result = process_message(list_json, &mut server);
+        assert!(list_result.is_ok());
+        let list_response = list_result.unwrap().unwrap();
+        let list_parsed: Value =
+            serde_json::from_str(&list_response).expect("Failed to parse tools list response");
+        assert_eq!(list_parsed["id"], 2);
+        let tools = list_parsed["result"]["tools"]
+            .as_array()
+            .expect("Tools not an array");
+        assert_eq!(tools.len(), 7);
+
+        // Verify each tool has required fields
+        for tool in tools {
+            assert!(tool["name"].is_string());
+            assert!(tool["description"].is_string());
+            assert!(tool["inputSchema"].is_object());
+        }
+    }
+
+    #[test]
+    fn test_mcp_tool_call_validation() {
+        let mut server = OpenSCADMCPServer::new();
+
+        // Call a valid tool: render_scad
+        let render_call = r#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"render_scad","arguments":{"file":"test.scad"}}}"#;
+        let render_result = process_message(render_call, &mut server);
+        assert!(render_result.is_ok());
+        let render_response = render_result.unwrap().unwrap();
+        let render_parsed: Value =
+            serde_json::from_str(&render_response).expect("Failed to parse render response");
+        assert_eq!(render_parsed["id"], 3);
+        assert!(render_parsed["result"].is_object());
+        assert!(!render_parsed.get("error").map_or(false, |e| e.is_object()));
+    }
+
+    #[test]
+    fn test_mcp_missing_method() {
+        let mut server = OpenSCADMCPServer::new();
+        let json = r#"{"jsonrpc":"2.0","id":5}"#;
+        let result = process_message(json, &mut server);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_mcp_invalid_json() {
+        let mut server = OpenSCADMCPServer::new();
+        let json = r#"{"jsonrpc":"2.0","id":6"#;
+        let result = process_message(json, &mut server);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_tool_schema_validation() {
+        let registry = ToolRegistry::new();
+
+        // Verify render_scad schema
+        let render_tool = registry.get("render_scad").expect("render_scad not found");
+        assert_eq!(render_tool.name, "render_scad");
+        assert!(render_tool.description.contains("PNG"));
+        let schema = &render_tool.input_schema;
+        assert_eq!(schema["type"], "object");
+        assert!(schema["properties"]["file"].is_object());
+        assert!(schema["required"].is_array());
+        assert!(schema["required"]
+            .as_array()
+            .unwrap()
+            .contains(&Value::String("file".to_string())));
+
+        // Verify export_scad schema
+        let export_tool = registry.get("export_scad").expect("export_scad not found");
+        assert_eq!(export_tool.name, "export_scad");
+        let export_schema = &export_tool.input_schema;
+        assert_eq!(export_schema["type"], "object");
+        assert!(export_schema["properties"]["format"]["enum"]
+            .as_array()
+            .unwrap()
+            .contains(&Value::String("stl".to_string())));
+    }
+
+    #[test]
+    fn test_all_tools_have_descriptions() {
+        let registry = ToolRegistry::new();
+        for tool in &registry.tools {
+            assert!(
+                !tool.description.is_empty(),
+                "Tool {} has no description",
+                tool.name
+            );
+            assert!(
+                tool.description.len() > 5,
+                "Tool {} description too short",
+                tool.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_mcp_error_response_format() {
+        let mut server = OpenSCADMCPServer::new();
+
+        // Call nonexistent tool
+        let json =
+            r#"{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"fake_tool"}}"#;
+        let result = process_message(json, &mut server);
+        assert!(result.is_ok());
+        let response = result.unwrap().unwrap();
+        let parsed: Value =
+            serde_json::from_str(&response).expect("Failed to parse error response");
+
+        // Verify error response structure
+        assert_eq!(parsed["jsonrpc"], "2.0");
+        assert_eq!(parsed["id"], 7);
+        assert!(parsed["error"].is_object());
+        assert!(parsed["error"]["code"].is_number());
+        assert!(parsed["error"]["message"].is_string());
+        assert!(!parsed.get("result").map_or(false, |r| r.is_object()));
+    }
+
+    #[test]
+    fn test_sequential_tool_calls() {
+        let mut server = OpenSCADMCPServer::new();
+
+        // Call render_scad
+        let call1 = r#"{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"render_scad","arguments":{"file":"model1.scad"}}}"#;
+        let res1 = process_message(call1, &mut server);
+        assert!(res1.is_ok());
+
+        // Call analyze_model
+        let call2 = r#"{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"analyze_model","arguments":{"file":"model2.scad"}}}"#;
+        let res2 = process_message(call2, &mut server);
+        assert!(res2.is_ok());
+
+        // Call export_scad
+        let call3 = r#"{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"export_scad","arguments":{"file":"model3.scad","format":"stl"}}}"#;
+        let res3 = process_message(call3, &mut server);
+        assert!(res3.is_ok());
+
+        // All calls succeed
+        let parsed1: Value = serde_json::from_str(&res1.unwrap().unwrap()).unwrap();
+        let parsed2: Value = serde_json::from_str(&res2.unwrap().unwrap()).unwrap();
+        let parsed3: Value = serde_json::from_str(&res3.unwrap().unwrap()).unwrap();
+
+        assert_eq!(parsed1["id"], 8);
+        assert_eq!(parsed2["id"], 9);
+        assert_eq!(parsed3["id"], 10);
+        assert!(parsed1["result"].is_object());
+        assert!(parsed2["result"].is_object());
+        assert!(parsed3["result"].is_object());
+    }
 }
