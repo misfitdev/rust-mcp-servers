@@ -16,6 +16,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1.0"
 dotenv = "0.15"
+which = "5.0"
 
 [lib]
 name = "openscad_mcp"

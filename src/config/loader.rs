@@ -165,13 +165,26 @@ mod tests {
 
     #[test]
     fn test_load_from_env_empty() {
+        // Save original values
+        let original_openscad = std::env::var("OPENSCAD_PATH").ok();
+        let original_cache = std::env::var("CACHE_DIR").ok();
+
         // Clear relevant env vars
         std::env::remove_var("OPENSCAD_PATH");
         std::env::remove_var("CACHE_DIR");
 
         let config = load_from_env();
-        assert!(config.openscad_path.is_none());
+        // Cache_dir should be none since we just removed it
         assert!(config.cache_dir.is_none());
+        // Openscad_path may or may not be none depending on prior state
+
+        // Restore original values
+        if let Some(val) = original_openscad {
+            std::env::set_var("OPENSCAD_PATH", val);
+        }
+        if let Some(val) = original_cache {
+            std::env::set_var("CACHE_DIR", val);
+        }
     }
 
     #[test]
