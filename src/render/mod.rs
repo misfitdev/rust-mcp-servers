@@ -86,6 +86,69 @@ pub async fn export_scad_to_format(content: &str, format: &str, output_path: &Pa
     Ok(())
 }
 
+/// Comparison result for two rendered models
+#[derive(Debug, Clone)]
+pub struct ComparisonResult {
+    /// Left model rendering output path
+    pub left_output: String,
+    /// Right model rendering output path
+    pub right_output: String,
+    /// Left model name/identifier
+    pub left_name: String,
+    /// Right model name/identifier
+    pub right_name: String,
+    /// Comparison summary (e.g., dimension differences)
+    pub summary: String,
+}
+
+/// Compare two OpenSCAD models side-by-side
+pub async fn compare_scad_renders(
+    left_content: &str,
+    right_content: &str,
+    left_name: &str,
+    right_name: &str,
+    output_dir: &Path,
+    params: &RenderParams,
+) -> Result<ComparisonResult> {
+    // Create output directory if needed
+    std::fs::create_dir_all(output_dir).map_err(|e| crate::error::Error::Filesystem(e))?;
+
+    // Render both models in parallel
+    let left_path = output_dir.join(format!("{}_left.png", left_name));
+    let right_path = output_dir.join(format!("{}_right.png", right_name));
+
+    let left_future = render_scad_to_png(left_content, &left_path, params);
+    let right_future = render_scad_to_png(right_content, &right_path, params);
+
+    let (left_result, right_result) = tokio::join!(left_future, right_future);
+
+    // Check results - at least one should succeed for a valid comparison
+    match (left_result, right_result) {
+        (Ok(()), Ok(())) => {
+            let summary = format!("Both models rendered successfully");
+            Ok(ComparisonResult {
+                left_output: left_path.to_string_lossy().to_string(),
+                right_output: right_path.to_string_lossy().to_string(),
+                left_name: left_name.to_string(),
+                right_name: right_name.to_string(),
+                summary,
+            })
+        }
+        (Ok(()), Err(e)) => Err(crate::error::Error::Render(format!(
+            "Right model render failed: {}",
+            e
+        ))),
+        (Err(e), Ok(())) => Err(crate::error::Error::Render(format!(
+            "Left model render failed: {}",
+            e
+        ))),
+        (Err(left_e), Err(right_e)) => Err(crate::error::Error::Render(format!(
+            "Both models failed to render - left: {}, right: {}",
+            left_e, right_e
+        ))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -296,6 +359,115 @@ mod tests {
                     err_str.contains("openscad not found")
                         || err_str.contains("OpenSCAD export failed")
                         || err_str.contains("No such file"),
+                    "Unexpected error: {}",
+                    err_str
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_compare_scad_renders_both_succeed() {
+        let left_content = "cube(10);";
+        let right_content = "sphere(r=5);";
+        let output_dir = PathBuf::from("/tmp/comparison_test");
+
+        let params = RenderParams::default();
+        let result = compare_scad_renders(
+            left_content,
+            right_content,
+            "left_model",
+            "right_model",
+            &output_dir,
+            &params,
+        )
+        .await;
+
+        // If OpenSCAD is available, this should succeed
+        match result {
+            Ok(comparison) => {
+                assert_eq!(comparison.left_name, "left_model");
+                assert_eq!(comparison.right_name, "right_model");
+                assert!(comparison
+                    .summary
+                    .contains("Both models rendered successfully"));
+            }
+            Err(e) => {
+                let err_str = format!("{:?}", e);
+                // Accept OpenSCAD not found in test environment
+                assert!(
+                    err_str.contains("openscad not found") || err_str.contains("failed to render"),
+                    "Unexpected error: {}",
+                    err_str
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_compare_scad_renders_one_fails() {
+        let left_content = "cube(10);";
+        let right_content = "invalid syntax here";
+        let output_dir = PathBuf::from("/tmp/comparison_test_fail");
+
+        let params = RenderParams::default();
+        let result = compare_scad_renders(
+            left_content,
+            right_content,
+            "valid_model",
+            "invalid_model",
+            &output_dir,
+            &params,
+        )
+        .await;
+
+        // Result should either be success (if OpenSCAD lax parsing) or error about render failure
+        match result {
+            Ok(_) => {
+                // Some versions of OpenSCAD may be lenient with syntax
+            }
+            Err(e) => {
+                let err_str = format!("{:?}", e);
+                // Error should mention render failure or OpenSCAD not found
+                assert!(
+                    err_str.contains("render failed") || err_str.contains("openscad not found"),
+                    "Expected render failure error: {}",
+                    err_str
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_compare_scad_renders_metadata() {
+        let left_content = "cube([5, 5, 5]);";
+        let right_content = "cube([10, 10, 10]);";
+        let output_dir = PathBuf::from("/tmp/comparison_metadata");
+
+        let params = RenderParams::default();
+        let result = compare_scad_renders(
+            left_content,
+            right_content,
+            "small",
+            "large",
+            &output_dir,
+            &params,
+        )
+        .await;
+
+        // Check that comparison result contains proper metadata
+        match result {
+            Ok(comparison) => {
+                assert_eq!(comparison.left_name, "small");
+                assert_eq!(comparison.right_name, "large");
+                // Verify output paths are set
+                assert!(comparison.left_output.contains("small_left"));
+                assert!(comparison.right_output.contains("large_right"));
+            }
+            Err(e) => {
+                let err_str = format!("{:?}", e);
+                assert!(
+                    err_str.contains("openscad not found") || err_str.contains("render failed"),
                     "Unexpected error: {}",
                     err_str
                 );
