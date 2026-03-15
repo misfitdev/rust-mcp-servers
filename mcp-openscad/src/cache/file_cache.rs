@@ -2,6 +2,7 @@
 //!
 //! Stores rendered PNG results indexed by SHA-256 hash of content + parameters.
 //! Supports TTL-based expiration and LRU-based size eviction.
+//! Uses persistent index file to avoid O(n) directory walks during eviction.
 
 use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
@@ -10,6 +11,79 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Cache entry metadata for the persistent index
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheIndexEntry {
+    /// Key (SHA-256 hash)
+    pub key: String,
+    /// File size in bytes
+    pub size_bytes: u64,
+    /// Last access time (seconds since epoch)
+    pub accessed_at: u64,
+}
+
+/// Persistent cache index to avoid O(n) directory walks
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheIndex {
+    /// Entries indexed by key
+    entries: BTreeMap<String, CacheIndexEntry>,
+}
+
+impl CacheIndex {
+    /// Create new empty index
+    fn new() -> Self {
+        Self {
+            entries: BTreeMap::new(),
+        }
+    }
+
+    /// Load index from file
+    fn load_from_file(path: &Path) -> Result<Self> {
+        if !path.exists() {
+            return Ok(Self::new());
+        }
+        let content =
+            fs::read_to_string(path)
+                .map_err(|e| Error::Cache(format!("Failed to read cache index: {}", e)))?;
+        serde_json::from_str(&content)
+            .map_err(|e| Error::Cache(format!("Failed to parse cache index: {}", e)))
+    }
+
+    /// Save index to file
+    fn save_to_file(&self, path: &Path) -> Result<()> {
+        let content = serde_json::to_string(self)
+            .map_err(|e| Error::Cache(format!("Failed to serialize index: {}", e)))?;
+        fs::write(path, content)
+            .map_err(|e| Error::Cache(format!("Failed to write cache index: {}", e)))
+    }
+
+    /// Add entry to index
+    fn insert(&mut self, entry: CacheIndexEntry) {
+        self.entries.insert(entry.key.clone(), entry);
+    }
+
+    /// Remove entry from index
+    fn remove(&mut self, key: &str) -> Option<CacheIndexEntry> {
+        self.entries.remove(key)
+    }
+
+    /// Get total size of all entries
+    fn total_size(&self) -> u64 {
+        self.entries.values().map(|e| e.size_bytes).sum()
+    }
+
+    /// Get all entries sorted by access time (oldest first)
+    fn entries_by_access_time(&self) -> Vec<(String, u64)> {
+        let mut entries: Vec<_> = self
+            .entries
+            .iter()
+            .map(|(k, e)| (k.clone(), e.accessed_at))
+            .collect();
+        entries.sort_by_key(|(_k, time)| *time);
+        entries
+    }
+}
 
 /// Cache metadata for a stored render
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,10 +124,11 @@ impl CacheMetadata {
     }
 }
 
-/// File-based cache
+/// File-based cache with persistent index
 pub struct FileCache {
     cache_dir: PathBuf,
     max_size_mb: u64,
+    index_path: PathBuf,
 }
 
 impl FileCache {
@@ -63,10 +138,18 @@ impl FileCache {
         fs::create_dir_all(&dir)
             .map_err(|e| Error::Cache(format!("Failed to create cache directory: {}", e)))?;
 
+        let index_path = dir.join(".cache_index.json");
+
         Ok(Self {
             cache_dir: dir,
             max_size_mb,
+            index_path,
         })
+    }
+
+    /// Get path to cache index file
+    fn get_index_path(&self) -> PathBuf {
+        self.index_path.clone()
     }
 
     /// Compute cache key from content and parameters
@@ -119,6 +202,19 @@ impl FileCache {
         fs::write(&metadata_path, metadata_json)
             .map_err(|e| Error::Cache(format!("Failed to write cache metadata: {}", e)))?;
 
+        // Update persistent index
+        let mut index = CacheIndex::load_from_file(&self.get_index_path())?;
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        index.insert(CacheIndexEntry {
+            key: key.to_string(),
+            size_bytes: image_data.len() as u64,
+            accessed_at: now,
+        });
+        index.save_to_file(&self.get_index_path())?;
+
         Ok(())
     }
 
@@ -149,6 +245,18 @@ impl FileCache {
         let image_data = fs::read(&image_path)
             .map_err(|e| Error::Cache(format!("Failed to read image: {}", e)))?;
 
+        // Update access time in index
+        let mut index = CacheIndex::load_from_file(&self.get_index_path())?;
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        if let Some(mut entry) = index.remove(key) {
+            entry.accessed_at = now;
+            index.insert(entry);
+            let _ = index.save_to_file(&self.get_index_path());
+        }
+
         Ok(Some((image_data, metadata)))
     }
 
@@ -159,6 +267,12 @@ impl FileCache {
             fs::remove_dir_all(&entry_dir)
                 .map_err(|e| Error::Cache(format!("Failed to delete cache entry: {}", e)))?;
         }
+
+        // Remove from index
+        let mut index = CacheIndex::load_from_file(&self.get_index_path())?;
+        index.remove(key);
+        let _ = index.save_to_file(&self.get_index_path());
+
         Ok(())
     }
 
@@ -195,45 +309,33 @@ impl FileCache {
     /// Evict oldest entries if cache size exceeded
     pub fn evict_if_needed(&self) -> Result<()> {
         let max_bytes = self.max_size_mb * 1024 * 1024;
-        let current_size = self.get_size()?;
+
+        // Load index (O(1) file read instead of O(n) directory walk)
+        let mut index = CacheIndex::load_from_file(&self.get_index_path())?;
+        let current_size = index.total_size();
 
         if current_size <= max_bytes {
             return Ok(());
         }
 
-        // Get all entries with modification time
-        let mut entries: Vec<(PathBuf, u64)> = Vec::new();
-
-        if self.cache_dir.exists() {
-            for entry in fs::read_dir(&self.cache_dir)
-                .map_err(|e| Error::Cache(format!("Failed to read cache dir: {}", e)))?
-            {
-                let entry =
-                    entry.map_err(|e| Error::Cache(format!("Failed to read dir entry: {}", e)))?;
-                let path = entry.path();
-
-                if path.is_dir() {
-                    if let Ok(metadata) = fs::metadata(&path) {
-                        if let Ok(modified) = metadata.modified() {
-                            if let Ok(elapsed) = modified.elapsed() {
-                                entries.push((path, elapsed.as_secs()));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Sort by modification time (oldest first)
-        entries.sort_by_key(|(_path, time)| *time);
+        // Get entries sorted by access time (oldest first)
+        let entries_by_time = index.entries_by_access_time();
 
         // Delete oldest entries until under limit
-        for (path, _) in entries {
-            if self.get_size()? <= max_bytes {
+        for (key, _) in entries_by_time {
+            if index.total_size() <= max_bytes {
                 break;
             }
-            let _ = fs::remove_dir_all(&path);
+            // Remove from filesystem
+            let entry_path = self.entry_path(&key);
+            let _ = fs::remove_dir_all(&entry_path);
+
+            // Remove from index
+            index.remove(&key);
         }
+
+        // Save updated index
+        index.save_to_file(&self.get_index_path())?;
 
         Ok(())
     }
