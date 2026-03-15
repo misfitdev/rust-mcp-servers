@@ -1,0 +1,26 @@
+version: 2
+
+pre-commit:
+  commands:
+    format-check:
+      glob: "**/*.{rs,toml}"
+      run: just fmt-check
+      stage_fixed: true
+
+    lint:
+      glob: "**/*.rs"
+      run: just lint
+
+    test:
+      glob: "**/*.rs"
+      run: just test
+
+    security:
+      glob: "**/*.rs"
+      run: just audit
+      skip_output: exit_code
+
+pre-push:
+  commands:
+    final-check:
+      run: just check
