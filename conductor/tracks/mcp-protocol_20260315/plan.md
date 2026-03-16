@@ -34,10 +34,12 @@ Wire all existing tools into the MCP server as callable tools.
     - [x] Register all rendering tools (render_scad, render_perspectives, compare_renders)
     - [x] Register all export tools (export to all formats: STL, 3MF, AMF, OFF, DXF, SVG)
     - [x] Register all analysis tools (analyze, dependencies, circular detection)
+    - [x] Register file management tools (create, read, update, list, delete models)
+    - [x] Register system tools (check_openscad, get_libraries, get_project_files, clear_cache)
     - [x] Map tool calls to registry lookup in handle_tools_call
 - [x] Task: Test tool execution through MCP a98c4fa
     - [x] Test tool registry and tool lookup
-    - [x] Test tool discovery via MCP tools/list returns all 7 tools
+    - [x] Test tool discovery via MCP tools/list returns all 17 tools
     - [x] Test tool call with valid tool returns success response
     - [x] Test tool call with invalid tool returns appropriate error
 - [x] Task: Conductor - Phase 2 Verification Protocol a98c4fa
@@ -60,5 +62,11 @@ Complete integration testing and validate MCP server works end-to-end.
     - [~] Run `cargo tarpaulin` - system dependency OpenSSL not available; skipped coverage check
     - [x] Run `cargo clippy` - verified: no clippy issues in mcp.rs
     - [x] Run `cargo fmt` - all code formatted
-    - [x] Ensure all tests pass: `cargo test --all` (238 tests: 224 openscad-mcp lib + 13 binary + 1 doc test)
+    - [x] Ensure all tests pass: `cargo test --all` (237 openscad-mcp lib tests)
+- [x] Task: Real tool execution implementation 86072e7
+    - [x] Implement actual OpenSCAD subprocess calls (not stubs)
+    - [x] Implement file management with real filesystem operations
+    - [x] Add graceful handling for tools without required arguments
+    - [x] Update tests to skip OpenSCAD-dependent features if binary not found
+    - [x] Verify all 17 tools execute correctly with real data
 - [x] Task: Conductor - Phase 3 Verification Protocol 37f611a
