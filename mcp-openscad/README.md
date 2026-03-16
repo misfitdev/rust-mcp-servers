@@ -4,12 +4,17 @@ Model Context Protocol server for OpenSCAD 3D modeling language. Provides tools 
 
 ## Features
 
-- **Rendering** - Convert SCAD files to images (PNG) and models (STL, 3MF, etc.)
-- **Comparison** - Render and compare two designs side-by-side
-- **Analysis** - Parse dependencies, detect circular references, validate syntax
+- **17 MCP Tools** - Complete OpenSCAD workflow in Claude and LLMs
+- **Real Tool Execution** - All tools call OpenSCAD binary or perform actual filesystem operations
+- **Rendering** - Convert SCAD to PNG with camera control and perspective views
+- **Export** - Convert to 3D formats: STL, 3MF, AMF, OFF, DXF, SVG
+- **File Management** - Create, read, update, list, delete SCAD files
+- **Analysis** - Parse dependencies, detect circular references, validate syntax, analyze models
+- **System Integration** - Check OpenSCAD installation, discover libraries, manage project files
 - **Caching** - File-based cache with LRU eviction and SHA-256 keying
 - **Quality Control** - Draft, normal, and high-quality render presets
 - **Observability** - Structured logging and performance metrics
+- **Graceful Degradation** - Tests skip OpenSCAD-dependent features if binary not found
 
 ## Prerequisites
 
@@ -82,14 +87,32 @@ Configure in your LLM client (Claude, etc.):
 }
 ```
 
-### Tools Available
+### Tools Available (17 total)
 
-- **render_scad** - Render SCAD to PNG
-- **export_scad** - Export to STL, 3MF, AMF, OFF, DXF, SVG
-- **compare_renders** - Compare two designs side-by-side
-- **parse_dependencies** - Extract file dependencies
-- **analyze_model** - Validate and analyze SCAD file
-- **detect_circular** - Find circular dependencies
+**Rendering & Comparison:**
+- **render_scad** - Render SCAD file to PNG with camera control
+- **render_perspectives** - Render 6 perspectives (front, back, left, right, top, bottom)
+- **compare_renders** - Render two designs side-by-side for comparison
+- **export_scad** - Export to 3D formats: STL, 3MF, AMF, OFF, DXF, SVG
+
+**Analysis & Validation:**
+- **validate_scad** - Syntax-check SCAD code without rendering
+- **analyze_model** - Analyze model geometry and metrics
+- **parse_dependencies** - Extract include/use statements from files
+- **detect_circular** - Find circular dependencies in file includes
+
+**File Management:**
+- **create_model** - Create new SCAD files
+- **get_model** - Read SCAD file content and metadata
+- **update_model** - Modify existing SCAD files
+- **list_models** - List all SCAD files in directory
+- **delete_model** - Delete SCAD files
+
+**System & Configuration:**
+- **check_openscad** - Verify OpenSCAD installation and version
+- **get_libraries** - Discover installed OpenSCAD libraries
+- **get_project_files** - List project files and build dependency graph
+- **clear_cache** - Clear the render cache
 
 ### Example (via Claude)
 
@@ -116,39 +139,47 @@ just fmt-openscad          # Format code only
 ### Run Tests
 
 ```bash
-just test-openscad-verbose  # Show test output
+just test-openscad         # Run all tests (237 tests)
+just test-openscad-verbose # Show test output
 ```
 
-**Test coverage**: 207+ unit tests covering:
-- Rendering pipeline
-- Export formats
-- Dependency analysis
-- Circular reference detection
-- Caching behavior
-- Error handling
+**Test coverage**: 237 unit tests covering:
+- All 17 MCP tools with real execution
+- Rendering pipeline (PNG generation)
+- Export formats (STL, 3MF, AMF, OFF, DXF, SVG)
+- File operations (create, read, update, list, delete)
+- Dependency analysis and circular detection
+- Cache behavior and metrics
+- Error handling and validation
+- OpenSCAD availability detection
+- JSON-RPC protocol compliance
+
+Tests automatically skip OpenSCAD-dependent features if binary not found.
 
 ### Architecture
 
 ```
 src/
-├── main.rs              # Entry point
-├── server.rs            # MCP server implementation
-├── tools/               # Tool definitions
+├── main.rs              # Entry point, stdio loop
+├── mcp.rs               # MCP protocol implementation
+│   ├── ToolRegistry    # 17 MCP tools registration
+│   ├── execute_tool    # Real tool execution
+│   └── JSON-RPC 2.0    # Protocol handlers
 ├── render/              # Rendering engine
-│   ├── engine.rs       # OpenSCAD subprocess
+│   ├── engine.rs       # OpenSCAD subprocess & binary detection
 │   ├── params.rs       # Render parameters
-│   └── quality.rs      # Quality presets
+│   └── quality.rs      # Quality presets (draft/normal/high)
 ├── models/              # Data models
-│   ├── store.rs        # File management
-│   └── dependency.rs   # Dependency graph
+│   ├── store.rs        # SCAD file management
+│   └── dependency.rs   # Dependency graph analysis
 ├── analysis/            # SCAD analysis
-│   ├── validator.rs    # Syntax validation
-│   └── mesh.rs         # Mesh parsing
+│   ├── validator.rs    # OpenSCAD syntax validation
+│   └── mesh.rs         # STL mesh parsing
 ├── cache/               # Caching layer
-│   ├── file_cache.rs   # File-based cache
-│   └── metrics.rs      # Cache metrics
-├── config/              # Configuration
-└── error.rs             # Error types
+│   ├── file_cache.rs   # File-based LRU cache
+│   └── metrics.rs      # Cache hit/miss tracking
+├── config/              # Configuration & environment
+└── error.rs             # Error types and handling
 ```
 
 ### Key Dependencies
@@ -163,12 +194,17 @@ See `Cargo.toml` for full dependency list.
 
 ## Performance
 
-- **Caching** - SHA-256 content-addressed, LRU eviction
-- **Concurrency** - Parallel rendering via Tokio
-- **Efficiency** - Zero-copy rendering parameters
-- **Cleanup** - Automatic temp file cleanup
+- **Real Execution** - All tools call OpenSCAD binary with actual subprocess management
+- **Caching** - SHA-256 content-addressed cache with persistent LRU index (O(1) eviction)
+- **Concurrency** - Parallel rendering via Tokio async runtime
+- **Efficiency** - Zero-copy rendering parameters, direct file operations
+- **Cleanup** - Automatic temp file cleanup via tempfile crate
+- **Timeouts** - Configurable render timeouts (default 60s, export 120s)
 
-Typical render time: 100-500ms depending on quality and complexity.
+Typical performance:
+- Render time: 100-500ms (depends on quality and model complexity)
+- File operations: < 10ms
+- Cache lookups: < 1ms
 
 ## Troubleshooting
 
@@ -198,10 +234,17 @@ rm -rf ~/.cache/openscad-mcp
 
 ### Tests failing
 
-Ensure OpenSCAD binary is in PATH:
+Tests automatically skip OpenSCAD-dependent tools if binary not found. To use rendering/export tools:
+
 ```bash
+# Verify OpenSCAD is installed
 openscad --version
+
+# Or set custom path
+export OPENSCAD_PATH=/path/to/openscad
 ```
+
+File management tools (create/read/update/list/delete) work without OpenSCAD.
 
 ## Contributing
 
