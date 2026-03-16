@@ -4,7 +4,7 @@ A workspace of Model Context Protocol (MCP) servers written in Rust.
 
 ## Overview
 
-This workspace provides high-quality MCP implementations designed for reliability, performance, and extensibility. Built with async Rust (Tokio), comprehensive testing (207+ unit tests), and security best practices.
+This workspace provides high-quality MCP implementations designed for reliability, performance, and extensibility. Built with async Rust (Tokio), comprehensive testing (237+ unit tests), and security best practices.
 
 ## Crates
 
