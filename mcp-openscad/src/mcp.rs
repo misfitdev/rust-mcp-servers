@@ -442,6 +442,33 @@ fn handle_tools_call(message: &Value, server: &OpenSCADMCPServer) -> Result<Opti
     }
 }
 
+/// Validate file path to prevent directory traversal attacks
+fn validate_file_path(path: &str) -> anyhow::Result<()> {
+    use std::path::Path;
+
+    let path_obj = Path::new(path);
+
+    // Reject absolute paths
+    if path_obj.is_absolute() {
+        return Err(anyhow::anyhow!("Absolute file paths are not allowed"));
+    }
+
+    // Reject parent directory references
+    for component in path_obj.components() {
+        use std::path::Component;
+        if matches!(component, Component::ParentDir) {
+            return Err(anyhow::anyhow!("Path traversal with '..' is not allowed"));
+        }
+    }
+
+    // Reject paths with null bytes
+    if path.contains('\0') {
+        return Err(anyhow::anyhow!("Path contains invalid null bytes"));
+    }
+
+    Ok(())
+}
+
 /// Execute a tool with the given arguments - REAL IMPLEMENTATION
 fn execute_tool(tool_name: &str, args: Option<&Value>) -> anyhow::Result<String> {
     let empty = json!({});
@@ -458,6 +485,7 @@ fn execute_tool(tool_name: &str, args: Option<&Value>) -> anyhow::Result<String>
 
             // REAL IMPLEMENTATION: Call OpenSCAD binary
             let scad_file = if let Some(f) = file {
+                validate_file_path(f)?;
                 f.to_string()
             } else if let Some(c) = content {
                 // Write content to temp file
@@ -510,6 +538,7 @@ fn execute_tool(tool_name: &str, args: Option<&Value>) -> anyhow::Result<String>
                 .get("file")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("Missing 'file' parameter"))?;
+            validate_file_path(file)?;
             let quality = args.get("quality").and_then(|v| v.as_str()).unwrap_or("normal");
 
             let engine = crate::render::engine::OpenSCADEngine::new()?;
@@ -564,6 +593,8 @@ fn execute_tool(tool_name: &str, args: Option<&Value>) -> anyhow::Result<String>
                 .get("right_file")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("Missing 'right_file' parameter"))?;
+            validate_file_path(left_file)?;
+            validate_file_path(right_file)?;
 
             let engine = crate::render::engine::OpenSCADEngine::new()?;
             let start = std::time::Instant::now();
@@ -609,6 +640,7 @@ fn execute_tool(tool_name: &str, args: Option<&Value>) -> anyhow::Result<String>
                 .get("file")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("Missing 'file' parameter"))?;
+            validate_file_path(file)?;
             let format = args
                 .get("format")
                 .and_then(|v| v.as_str())
@@ -653,6 +685,7 @@ fn execute_tool(tool_name: &str, args: Option<&Value>) -> anyhow::Result<String>
             }
 
             let scad_file = if let Some(f) = file {
+                validate_file_path(f)?;
                 f.to_string()
             } else if let Some(c) = content {
                 let temp_file = tempfile::NamedTempFile::new()?;
@@ -693,6 +726,7 @@ fn execute_tool(tool_name: &str, args: Option<&Value>) -> anyhow::Result<String>
                 .get("file")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("Missing 'file' parameter"))?;
+            validate_file_path(file)?;
 
             let engine = crate::render::engine::OpenSCADEngine::new()?;
 
@@ -765,6 +799,7 @@ fn execute_tool(tool_name: &str, args: Option<&Value>) -> anyhow::Result<String>
                 .get("file")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("Missing 'file' parameter"))?;
+            validate_file_path(file)?;
 
             let content = fs::read_to_string(file)?;
             let metadata = fs::metadata(file)?;
@@ -781,6 +816,7 @@ fn execute_tool(tool_name: &str, args: Option<&Value>) -> anyhow::Result<String>
                 .get("file")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("Missing 'file' parameter"))?;
+            validate_file_path(file)?;
             let content = args
                 .get("content")
                 .and_then(|v| v.as_str())
@@ -825,6 +861,7 @@ fn execute_tool(tool_name: &str, args: Option<&Value>) -> anyhow::Result<String>
                 .get("file")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("Missing 'file' parameter"))?;
+            validate_file_path(file)?;
 
             fs::remove_file(file)?;
 
@@ -980,6 +1017,7 @@ fn execute_tool(tool_name: &str, args: Option<&Value>) -> anyhow::Result<String>
                 .get("file")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("Missing 'file' parameter"))?;
+            validate_file_path(file)?;
 
             let mut includes = Vec::new();
             let mut uses = Vec::new();
@@ -1023,6 +1061,7 @@ fn execute_tool(tool_name: &str, args: Option<&Value>) -> anyhow::Result<String>
                 .get("file")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("Missing 'file' parameter"))?;
+            validate_file_path(file)?;
 
             // Simple circular dependency detection by reading includes recursively
             let mut visited = std::collections::HashSet::new();
@@ -1503,11 +1542,10 @@ mod tests {
     #[test]
     fn test_tool_execution_file_management_tools() {
         // Test file management tools that don't require OpenSCAD
-        let temp_file = tempfile::NamedTempFile::new().unwrap();
-        let temp_path = temp_file.path().to_string_lossy().to_string();
-        fs::write(&temp_path, "cube(5);").unwrap();
+        let test_file = "test_file_mgmt.scad";
+        fs::write(test_file, "cube(5);").unwrap();
 
-        let file_args = json!({ "file": temp_path.clone() });
+        let file_args = json!({ "file": test_file });
 
         let tools = vec![
             ("parse_dependencies", Some(&file_args)),
@@ -1521,7 +1559,7 @@ mod tests {
         }
 
         // Clean up
-        let _ = fs::remove_file(&temp_path);
+        let _ = fs::remove_file(test_file);
     }
 
     #[test]
@@ -1531,12 +1569,11 @@ mod tests {
             return;
         }
 
-        // Create temporary test files
-        let temp_file = tempfile::NamedTempFile::new().unwrap();
-        let temp_path = temp_file.path().to_string_lossy().to_string();
-        fs::write(&temp_path, "cube(10);").unwrap();
+        // Create temporary test files in current directory (relative path)
+        let test_file = "test_openscad.scad";
+        fs::write(test_file, "cube(10);").unwrap();
 
-        let file_args = json!({ "file": temp_path.clone() });
+        let file_args = json!({ "file": test_file });
 
         // Test tools that require OpenSCAD
         let tools = vec![
@@ -1559,6 +1596,6 @@ mod tests {
         }
 
         // Clean up
-        let _ = fs::remove_file(&temp_path);
+        let _ = fs::remove_file(test_file);
     }
 }
