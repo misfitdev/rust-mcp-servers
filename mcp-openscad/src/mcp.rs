@@ -444,7 +444,8 @@ fn handle_tools_call(message: &Value, server: &OpenSCADMCPServer) -> Result<Opti
 
 /// Execute a tool with the given arguments - REAL IMPLEMENTATION
 fn execute_tool(tool_name: &str, args: Option<&Value>) -> anyhow::Result<String> {
-    let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+    let empty = json!({});
+    let args = args.unwrap_or(&empty);
 
     match tool_name {
         "render_scad" => {
