@@ -13,8 +13,8 @@
     "type": "binary",
     "entry_point": "openscad-mcp",
     "mcp_config": {
-      "command": "bash",
-      "args": ["-c", "exec \"$1\" \"$@\"", "bash", "${entry_point}"],
+      "command": "${__dirname}/openscad-mcp",
+      "args": [],
       "env": {}
     }
   },
