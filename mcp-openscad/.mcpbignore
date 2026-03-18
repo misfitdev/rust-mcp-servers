@@ -6,3 +6,6 @@
 .gitignore
 target/
 Cargo.lock
+Cargo.toml
+justfile
+src/
