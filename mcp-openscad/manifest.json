@@ -1,0 +1,129 @@
+{
+  "manifest_version": "0.2",
+  "name": "openscad",
+  "display_name": "OpenSCAD",
+  "version": "0.1.0",
+  "description": "MCP server for OpenSCAD",
+  "long_description": "Model Context Protocol server for OpenSCAD 3D modeling language. Provides tools for rendering, analyzing, and manipulating OpenSCAD designs through Claude and other LLMs.",
+  "author": {
+    "name": "Misfit Development"
+  },
+  "homepage": "https://misfit.dev",
+  "server": {
+    "type": "binary",
+    "entry_point": "openscad-mcp",
+    "mcp_config": {
+      "command": "./openscad-mcp",
+      "args": [],
+      "env": {}
+    }
+  },
+  "tools": [
+    {
+      "name": "render_scad",
+      "description": "Render SCAD file to PNG with camera control (position, rotation, zoom)"
+    },
+    {
+      "name": "render_perspectives",
+      "description": "Render 6 perspectives (front, back, left, right, top, bottom) of a SCAD model"
+    },
+    {
+      "name": "compare_renders",
+      "description": "Render two designs side-by-side for visual comparison"
+    },
+    {
+      "name": "export_scad",
+      "description": "Export SCAD model to 3D formats: STL, 3MF, AMF, OFF, DXF, or SVG"
+    },
+    {
+      "name": "validate_scad",
+      "description": "Syntax-check SCAD code without rendering to detect errors"
+    },
+    {
+      "name": "analyze_model",
+      "description": "Analyze model geometry and extract metrics (bounds, complexity, etc)"
+    },
+    {
+      "name": "parse_dependencies",
+      "description": "Extract include and use statements from SCAD files to build dependency graph"
+    },
+    {
+      "name": "detect_circular",
+      "description": "Find circular dependencies in file includes (A→B→A patterns)"
+    },
+    {
+      "name": "create_model",
+      "description": "Create new SCAD files with specified content and path"
+    },
+    {
+      "name": "get_model",
+      "description": "Read SCAD file content and metadata (size, modified time, etc)"
+    },
+    {
+      "name": "update_model",
+      "description": "Modify existing SCAD files with new content or append code"
+    },
+    {
+      "name": "list_models",
+      "description": "List all SCAD files in a directory with optional filtering"
+    },
+    {
+      "name": "delete_model",
+      "description": "Delete SCAD files safely with optional batch operations"
+    },
+    {
+      "name": "check_openscad",
+      "description": "Verify OpenSCAD installation and get version information"
+    },
+    {
+      "name": "get_libraries",
+      "description": "Discover installed OpenSCAD libraries and their locations"
+    },
+    {
+      "name": "get_project_files",
+      "description": "List all project files and build dependency graph for analysis"
+    },
+    {
+      "name": "clear_cache",
+      "description": "Clear the render cache to free disk space or reset cached renders"
+    }
+  ],
+  "user_config": {
+    "OPENSCAD_PATH": {
+      "type": "directory",
+      "title": "Custom OpenSCAD binary location",
+      "description": "Path to custom OpenSCAD binary if not in PATH",
+      "required": false,
+      "sensitive": false
+    },
+    "RUST_LOG": {
+      "type": "string",
+      "title": "Rust Log Level",
+      "description": "Logging level for debugging (e.g., 'openscad_mcp=debug', 'info')",
+      "required": false,
+      "sensitive": false
+    },
+    "SCAD_CACHE_DIR": {
+      "type": "string",
+      "title": "Cache directory",
+      "description": "Directory for render cache storage",
+      "required": false,
+      "sensitive": false
+    },
+    "SCAD_CACHE_SIZE": {
+      "type": "string",
+      "title": "Cache size limit",
+      "description": "Maximum cache size in bytes (default: 1073741824 = 1GB)",
+      "required": false,
+      "sensitive": false
+    },
+    "SCAD_RENDER_TIMEOUT": {
+      "type": "string",
+      "title": "Render timeout",
+      "description": "Maximum time in seconds for render operations (default: 300)",
+      "required": false,
+      "sensitive": false
+    }
+  },
+  "license": "MIT"
+}
