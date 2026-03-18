@@ -11,10 +11,10 @@
   "homepage": "https://misfit.dev",
   "server": {
     "type": "binary",
-    "entry_point": "openscad-mcp",
+    "entry_point": "run.sh",
     "mcp_config": {
-      "command": "./openscad-mcp",
-      "args": [],
+      "command": "bash",
+      "args": ["run.sh"],
       "env": {}
     }
   },
