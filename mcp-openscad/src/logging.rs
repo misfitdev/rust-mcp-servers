@@ -15,13 +15,19 @@ use tracing_subscriber::EnvFilter;
 pub fn init() {
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
-    tracing_subscriber::fmt().with_env_filter(env_filter).init();
+    tracing_subscriber::fmt()
+        .with_env_filter(env_filter)
+        .with_writer(std::io::stderr)
+        .init();
 }
 
 /// Initialize logging with a specific level
 pub fn init_with_level(level: &str) {
     let env_filter = EnvFilter::new(level);
-    tracing_subscriber::fmt().with_env_filter(env_filter).init();
+    tracing_subscriber::fmt()
+        .with_env_filter(env_filter)
+        .with_writer(std::io::stderr)
+        .init();
 }
 
 #[cfg(test)]
