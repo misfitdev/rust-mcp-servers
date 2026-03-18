@@ -381,7 +381,7 @@ fn handle_initialize(message: &Value) -> Result<Option<String>> {
     let response = build_success_response(
         id,
         json!({
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": "2025-11-25",
             "capabilities": {
                 "tools": {}
             },
