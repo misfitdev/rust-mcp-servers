@@ -16,11 +16,7 @@
       "command": "${__dirname}/openscad-mcp",
       "args": [],
       "env": {
-        "OPENSCAD_PATH": "${user_config.OPENSCAD_PATH}",
-        "RUST_LOG": "${user_config.RUST_LOG}",
-        "SCAD_CACHE_DIR": "${user_config.SCAD_CACHE_DIR}",
-        "SCAD_CACHE_SIZE": "${user_config.SCAD_CACHE_SIZE}",
-        "SCAD_RENDER_TIMEOUT": "${user_config.SCAD_RENDER_TIMEOUT}"
+        "RUST_LOG": "info"
       }
     }
   },
