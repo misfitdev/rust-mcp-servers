@@ -13,8 +13,8 @@
     "type": "binary",
     "entry_point": "run.sh",
     "mcp_config": {
-      "command": "bash",
-      "args": ["run.sh"],
+      "command": "run.sh",
+      "args": [],
       "env": {}
     }
   },
