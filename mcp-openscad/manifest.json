@@ -16,6 +16,7 @@
       "command": "${__dirname}/openscad-mcp",
       "args": [],
       "env": {
+        "NO_COLOR": "1",
         "RUST_LOG": "info",
         "SCAD_CACHE_SIZE": "1073741824",
         "SCAD_RENDER_TIMEOUT": "300"

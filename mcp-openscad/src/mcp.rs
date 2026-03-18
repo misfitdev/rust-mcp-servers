@@ -370,6 +370,7 @@ fn process_message(message: &str, server: &mut OpenSCADMCPServer) -> Result<Opti
         "initialize" => handle_initialize(&json),
         "tools/list" => handle_tools_list(&json, server),
         "tools/call" => handle_tools_call(&json, server),
+        "notifications/initialized" => Ok(None), // Notification, no response needed
         _ => Err(anyhow::anyhow!("Unknown method: {}", method)),
     }
 }
