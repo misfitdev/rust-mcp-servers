@@ -647,13 +647,25 @@ fn execute_tool(tool_name: &str, args: Option<&Value>) -> anyhow::Result<String>
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("Missing 'format' parameter"))?;
 
-            // Strip .scad extension if present
-            let base_name = if file.ends_with(".scad") {
-                &file[..file.len() - 5]
+            // Get cache directory (respect SCAD_CACHE_DIR env var)
+            let cache_dir = if let Ok(dir) = std::env::var("SCAD_CACHE_DIR") {
+                dir
+            } else if let Ok(home) = std::env::var("HOME") {
+                format!("{}/.cache/openscad-mcp", home)
             } else {
-                file
+                ".cache/openscad-mcp".to_string()
             };
-            let output_file = format!("{}.{}", base_name, format);
+
+            // Create cache directory if it doesn't exist
+            fs::create_dir_all(&cache_dir)
+                .map_err(|e| anyhow::anyhow!("Failed to create cache directory: {}", e))?;
+
+            // Strip .scad extension and get base filename (not full path)
+            let base_name = std::path::Path::new(file)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("export");
+            let output_file = format!("{}/{}.{}", cache_dir, base_name, format);
 
             let engine = crate::render::engine::OpenSCADEngine::new()?;
             let start = std::time::Instant::now();
@@ -1265,7 +1277,7 @@ mod tests {
         assert!(init_parsed["result"]["protocolVersion"]
             .as_str()
             .unwrap()
-            .contains("2024"));
+            .contains("2025"));
 
         // Step 2: List tools
         let list_json = r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#;
